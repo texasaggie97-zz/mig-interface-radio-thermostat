@@ -5,12 +5,13 @@
         <Option Name="BaseUrl" Value="/" />
         <Option Name="HomePath" Value="html" />
         <Option Name="Host" Value="*" />
-        <Option Name="Port" Value="8080" />
+        <Option Name="Port" Value="8088" />
         <Option Name="EnableFileCaching" Value="True" />
     </Gateway>
 </Gateways>
 <Interfaces>
-  <Interface Domain="Example.InterfaceSkelton" IsEnabled="true" AssemblyName="MIG-RadioThermostat.dll">
+  <Interface Domain="HomeAutomation.InterfaceRadioThermostat" IsEnabled="true" AssemblyName="MIG-RadioThermostat.dll" SupportedPlatform="All">
+    <Description>Radio Thermostat</Description>
     <Options />
   </Interface>
 </Interfaces>

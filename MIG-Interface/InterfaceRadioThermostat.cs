@@ -23,11 +23,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 
 using MIG.Config;
 
 // TODO: notes about ns naming conventions
-namespace MIG.Interfaces.RadioThermostat
+namespace MIG.Interfaces.HomeAutomation
 {
 
     public class InterfaceRadioThermostat : MigInterface
@@ -78,11 +81,65 @@ namespace MIG.Interfaces.RadioThermostat
             modules.Add(module_1);
             modules.Add(module_2);
             modules.Add(module_3);
+
+            List<IPAddress> thermostats = GetThermostats();
         }
 
         public void Dispose()
         {
             Disconnect();
+        }
+
+        private List<IPAddress> GetThermostats()
+        {
+            // C# implementation adapted from Radio Thermostat REST API documentation
+            string LOCATION_HDR = "LOCATION: http://";
+            string SSDP_ADDR = "239.255.255.250";
+            int SSDP_PORT = 1900;
+
+            var therms = new List<IPAddress>();
+            Socket sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            sock.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            sock.ReceiveTimeout = 3000;
+            sock.Ttl = 3;
+            EndPoint iep = new IPEndPoint(IPAddress.Any, 0);
+            sock.Bind(iep);
+            IPAddress ip = IPAddress.Parse(SSDP_ADDR);
+            sock.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(ip));
+
+            EndPoint dep = new IPEndPoint(ip, SSDP_PORT);
+            // dep.AddressFamily = AddressFamily.InterNetwork;
+
+            byte[] buffer = Encoding.ASCII.GetBytes("TYPE: WM-DISCOVER\r\nVERSION: 1.0\r\n\r\nservices: com.marvell.wm.system*\r\n\r\n");
+            sock.SendTo(buffer, dep);
+            
+            while(true)
+            {
+                byte[] msg = new Byte[1024];
+                try
+                {
+                    sock.ReceiveFrom(msg, ref dep);
+                }
+                catch(SocketException e)
+                {
+                    if (e.SocketErrorCode == SocketError.TimedOut)
+                    {
+                        break;
+                    }
+                }
+
+                string[] tokens = Encoding.ASCII.GetString(msg).Split(new char[2]{'\r', '\n'});
+                foreach (string t in tokens)
+                {
+                    if (t.StartsWith(LOCATION_HDR, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        string[] temp = t.Split(new char[1] { '/' });
+                        therms.Add(IPAddress.Parse(temp[2]));
+                    }
+                }
+            }
+
+            return therms;
         }
 
         #endregion
