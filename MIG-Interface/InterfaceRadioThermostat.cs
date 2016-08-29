@@ -92,6 +92,7 @@ namespace MIG.Interfaces.HomeAutomation
 
         private List<IPAddress> GetThermostats()
         {
+            // C# implementation adapted from Radio Thermostat REST API documentation
             string LOCATION_HDR = "LOCATION: http://";
             string SSDP_ADDR = "239.255.255.250";
             int SSDP_PORT = 1900;
