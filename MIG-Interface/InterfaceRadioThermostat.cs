@@ -27,7 +27,7 @@ using System.Linq;
 using MIG.Config;
 
 // TODO: notes about ns naming conventions
-namespace MIG.Interfaces.RadioThermostat
+namespace MIG.Interfaces.HomeAutomation
 {
 
     public class InterfaceRadioThermostat : MigInterface

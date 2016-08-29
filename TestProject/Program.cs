@@ -52,7 +52,7 @@ namespace TestProject
             migService.StartService();
 
             // Get a reference to the test interface
-            var interfaceDomain = "Example.InterfaceSkelton";
+            var interfaceDomain = "HomeAutomation.InterfaceRadioThermostat";
             var migInterface = migService.GetInterface(interfaceDomain);
             // Test an interface API command programmatically <module_domain>/<module_address>/<command>[/<option_0>[/../<option_n>]]
             var response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/3/Greet.Hello/Username"));
