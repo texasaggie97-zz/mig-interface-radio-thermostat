@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Interface Domain="HomeAutomation.InterfaceRadioThermostat" AssemblyName="MIG-RadioThermostat.dll" SupportedPlatform="All">
+<Interface Domain="RadioThermostat.InterfaceRadioThermostat" AssemblyName="MIG-RadioThermostat.dll" SupportedPlatform="All">
     <Description>Radio Thermostat</Description>
     <Options />
 </Interface>

@@ -30,27 +30,16 @@ using System.Text;
 using MIG.Config;
 
 // TODO: notes about ns naming conventions
-namespace MIG.Interfaces.HomeAutomation
+namespace MIG.Interfaces.RadioThermostat
 {
 
     public class InterfaceRadioThermostat : MigInterface
     {
-
-        #region MigInterface API commands and events
-
-        public enum Commands
+        public static bool AddSimulationDevice = false;
+        public static void SetSimulation(bool sim)
         {
-            NotSet,
-
-            Control_On,
-            Control_Off,
-
-            Temperature_Get,
-
-            Greet_Hello
+            AddSimulationDevice = sim;
         }
-
-        #endregion
 
         #region Private fields
 
@@ -64,25 +53,34 @@ namespace MIG.Interfaces.HomeAutomation
         public InterfaceRadioThermostat()
         {
             modules = new List<InterfaceModule>();
-            // manually add some fake modules
-            var module_1 = new InterfaceModule();
-            module_1.Domain = this.GetDomain();
-            module_1.Address = "1";
-            module_1.ModuleType = ModuleTypes.Light;
-            var module_2 = new InterfaceModule();
-            module_2.Domain = this.GetDomain();
-            module_2.Address = "2";
-            module_2.ModuleType = ModuleTypes.Sensor;
-            var module_3 = new InterfaceModule();
-            module_3.Domain = this.GetDomain();
-            module_3.Address = "3";
-            module_3.ModuleType = ModuleTypes.Sensor;
-            // add them to the modules list
-            modules.Add(module_1);
-            modules.Add(module_2);
-            modules.Add(module_3);
 
             List<IPAddress> thermostats = GetThermostats();
+            foreach (IPAddress ipa in thermostats)
+            {
+                byte[] b = ipa.GetAddressBytes();
+                var mod = new InterfaceModule();
+                mod.Domain = this.GetDomain();
+                mod.Address = Convert.ToString(b[3]);
+                mod.ModuleType = ModuleTypes.Thermostat;
+                mod.Description = "Radio Thermostat";
+                DeviceHolder dev = new DeviceHolder(false);
+                dev.Initialize(ipa, this);
+                mod.CustomData = dev;
+                modules.Add(mod);
+            }
+
+            if (AddSimulationDevice)
+            {
+                var mod = new InterfaceModule();
+                mod.Domain = this.GetDomain();
+                mod.Address = "256"; // Invalid ip
+                mod.ModuleType = ModuleTypes.Thermostat;
+                mod.Description = "Radio Thermostat Simulated Device";
+                DeviceHolder dev = new DeviceHolder(true);
+                dev.Initialize(IPAddress.Any, this);
+                mod.CustomData = dev;
+                modules.Add(mod);
+            }
         }
 
         public void Dispose()
@@ -207,33 +205,13 @@ namespace MIG.Interfaces.HomeAutomation
 
         public object InterfaceControl(MigInterfaceCommand request)
         {
+            var module = modules.Find (m => m.Address.Equals (request.Address));
             var response = new ResponseText("OK"); //default success value
 
-            Commands command;
-            Enum.TryParse<Commands>(request.Command.Replace(".", "_"), out command);
-
-            var module = modules.Find (m => m.Address.Equals (request.Address));
-
-            if (module != null) {
-                switch (command) {
-                case Commands.Control_On:
-                // TODO: ...
-                    OnInterfacePropertyChanged (this.GetDomain (), request.Address, "Test Interface", "Status.Level", 1);
-                    break;
-                case Commands.Control_Off:
-                    OnInterfacePropertyChanged (this.GetDomain (), request.Address, "Test Interface", "Status.Level", 0);
-                // TODO: ...
-                    break;
-                case Commands.Temperature_Get:
-                    OnInterfacePropertyChanged (this.GetDomain (), request.Address, "Test Interface", "Sensor.Temperature", 19.75);
-                // TODO: ...
-                    break;
-                case Commands.Greet_Hello:
-                // TODO: ...
-                    OnInterfacePropertyChanged (this.GetDomain (), request.Address, "Test Interface", "Sensor.Message", String.Format ("Hello {0}", request.GetOption (0)));
-                    response = new ResponseText ("Hello World!");
-                    break;
-                }
+            if (module != null)
+            {
+                DeviceHolder dev = (DeviceHolder)module.CustomData;
+                response = dev.Control(request);
             }
             else 
             {
@@ -266,7 +244,7 @@ namespace MIG.Interfaces.HomeAutomation
             }
         }
 
-        protected virtual void OnInterfacePropertyChanged(string domain, string source, string description, string propertyPath, object propertyValue)
+        public virtual void OnInterfacePropertyChanged(string domain, string source, string description, string propertyPath, object propertyValue)
         {
             if (InterfacePropertyChanged != null)
             {
