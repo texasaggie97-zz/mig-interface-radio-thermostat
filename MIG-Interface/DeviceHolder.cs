@@ -254,11 +254,12 @@ namespace MIG.Interfaces.HomeAutomation
     {
         NetHelper netHelper;
 
-        public DeviceHolder(bool simulate)
+        public DeviceHolder(bool simulate, string moduleAddress)
         {
             netHelper = new NetHelper();
             Options = new List<DeviceOption>();
             IsSimulated = simulate;
+            ModuleAddress = moduleAddress;
         }
 
         public NetHelper Net
@@ -275,13 +276,14 @@ namespace MIG.Interfaces.HomeAutomation
 
         public RadioThermostat Parent { get; set; }
 
+        public string ModuleAddress { get; set; }
+
         public ResponseText Control(MigInterfaceCommand request)
         {
             var response = new ResponseText("OK"); //default success value
             bool raiseEvent = false;
             string eventParameter = ModuleEvents.Status_Level;
             string eventValue = "";
-            string nodeId = request.Address;
 
             Commands command;
             Enum.TryParse<Commands>(request.Command.Replace(".", "_"), out command);
@@ -372,7 +374,7 @@ namespace MIG.Interfaces.HomeAutomation
 
             if (raiseEvent)
             {
-                Parent.OnInterfacePropertyChanged(this.GetDomain(), nodeId, "Radio Thermostat Node", eventParameter, eventValue);
+                Parent.OnInterfacePropertyChanged(this.GetDomain(), ModuleAddress, "Radio Thermostat Node", eventParameter, eventValue);
             }
 
             return response;
@@ -389,7 +391,7 @@ namespace MIG.Interfaces.HomeAutomation
                 if (IsSimulated)
                 {
                     Extensions.SetOption(this, "temp", 77.0);
-                    //Parent.OnInterfacePropertyChanged(this.GetDomain(), nodeId, "Radio Thermostat Node", ModuleEvents.Sensor_Temperature, "77.0");
+                    // Parent.OnInterfacePropertyChanged(this.GetDomain(), ModuleAddress, "Radio Thermostat Node", ModuleEvents.Sensor_Temperature, "77.0");
                     Extensions.SetOption(this, "tmode", ThermostatMode.Cool);
                     Extensions.SetOption(this, "tstate", ThermostatOperatingState.Cooling);
                     Extensions.SetOption(this, "fmode", ThermostatFanMode.AutoHigh);

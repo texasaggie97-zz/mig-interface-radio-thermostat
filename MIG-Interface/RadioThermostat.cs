@@ -63,7 +63,7 @@ namespace MIG.Interfaces.HomeAutomation
                 mod.Address = Convert.ToString(b[3]);
                 mod.ModuleType = ModuleTypes.Thermostat;
                 mod.Description = "Radio Thermostat";
-                DeviceHolder dev = new DeviceHolder(false);
+                DeviceHolder dev = new DeviceHolder(false, mod.Address);
                 dev.Initialize(ipa, this);
                 mod.CustomData = dev;
                 modules.Add(mod);
@@ -76,7 +76,7 @@ namespace MIG.Interfaces.HomeAutomation
                 mod.Address = "256"; // Invalid ip
                 mod.ModuleType = ModuleTypes.Thermostat;
                 mod.Description = "Radio Thermostat Simulated Device";
-                DeviceHolder dev = new DeviceHolder(true);
+                DeviceHolder dev = new DeviceHolder(true, mod.Address);
                 dev.Initialize(IPAddress.Any, this);
                 mod.CustomData = dev;
                 modules.Add(mod);
