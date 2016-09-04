@@ -11,7 +11,7 @@ using MIG.Config;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MIG.Interfaces.RadioThermostat
+namespace MIG.Interfaces.HomeAutomation
 {
     public static class Extensions
     {
@@ -273,7 +273,7 @@ namespace MIG.Interfaces.RadioThermostat
         public IPAddress Address { get; set; }
         public List<DeviceOption> Options { get; set; }
 
-        public InterfaceRadioThermostat Parent { get; set; }
+        public RadioThermostat Parent { get; set; }
 
         public ResponseText Control(MigInterfaceCommand request)
         {
@@ -379,7 +379,7 @@ namespace MIG.Interfaces.RadioThermostat
         }
 
 
-        public void Initialize(IPAddress address, InterfaceRadioThermostat parent)
+        public void Initialize(IPAddress address, RadioThermostat parent)
         {
             try
             {
@@ -389,7 +389,7 @@ namespace MIG.Interfaces.RadioThermostat
                 if (IsSimulated)
                 {
                     Extensions.SetOption(this, "temp", 77.0);
-                    // Parent.OnInterfacePropertyChanged(this.GetDomain(), nodeId, "Radio Thermostat Node", ModuleEvents.Sensor_Temperature, "77.0");
+                    //Parent.OnInterfacePropertyChanged(this.GetDomain(), nodeId, "Radio Thermostat Node", ModuleEvents.Sensor_Temperature, "77.0");
                     Extensions.SetOption(this, "tmode", ThermostatMode.Cool);
                     Extensions.SetOption(this, "tstate", ThermostatOperatingState.Cooling);
                     Extensions.SetOption(this, "fmode", ThermostatFanMode.AutoHigh);

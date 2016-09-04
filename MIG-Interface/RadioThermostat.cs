@@ -30,10 +30,10 @@ using System.Text;
 using MIG.Config;
 
 // TODO: notes about ns naming conventions
-namespace MIG.Interfaces.RadioThermostat
+namespace MIG.Interfaces.HomeAutomation
 {
 
-    public class InterfaceRadioThermostat : MigInterface
+    public class RadioThermostat : MigInterface
     {
         public static bool AddSimulationDevice = false;
         public static void SetSimulation(bool sim)
@@ -50,7 +50,7 @@ namespace MIG.Interfaces.RadioThermostat
 
         #region Lifecycle
 
-        public InterfaceRadioThermostat()
+        public RadioThermostat()
         {
             modules = new List<InterfaceModule>();
 

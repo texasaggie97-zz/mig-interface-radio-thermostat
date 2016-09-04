@@ -27,7 +27,7 @@ using System.Xml.Serialization;
 using MIG;
 using MIG.Config;
 
-using MIG.Interfaces.RadioThermostat;
+using MIG.Interfaces.HomeAutomation;
 
 namespace TestProject
 {
@@ -48,7 +48,7 @@ namespace TestProject
         public static void Main (string[] args)
         {
             Console.WriteLine("Mig Interface Skelton test APP");
-            InterfaceRadioThermostat.SetSimulation(true);
+            RadioThermostat.SetSimulation(true);
 
             var migService = new MigService();
 
@@ -67,7 +67,7 @@ namespace TestProject
             migService.StartService();
 
             // Get a reference to the test interface
-            var interfaceDomain = "RadioThermostat.InterfaceRadioThermostat";
+            var interfaceDomain = "HomeAutomation.RadioThermostat";
             var migInterface = migService.GetInterface(interfaceDomain);
             string modAddress = "256";
             // Test an interface API command programmatically <module_domain>/<module_address>/<command>[/<option_0>[/../<option_n>]]

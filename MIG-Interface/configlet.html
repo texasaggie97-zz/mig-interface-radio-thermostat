@@ -1,9 +1,9 @@
 <!-- HomeGenie interface settings configlet -->
-<div data-configlet-id="Example.InterfaceSkelton">
+<div data-configlet-id="HomeAutomation.RadioThermostat">
 
     <div class="ui-grid-a">
         <div class="ui-block-a">
-            HomeGenie/MIG interface configlet example 
+            HomeGenie/MIG interface configlet example
         </div>
         <div class="ui-block-b">
             <span style="float:right">
@@ -14,13 +14,13 @@
             </span>
         </div>
     </div>
-    
+
 </div>
 
 <script type="text/javascript" language="javascript">
-HG.WebApp.SystemSettings.Interfaces['Example.InterfaceSkelton'] = {
+    HG.WebApp.SystemSettings.Interfaces['HomeAutomation.RadioThermostat'] = {
 
-    Id: 'Example.InterfaceSkelton',
+    Id: 'HomeAutomation.RadioThermostat',
     Initialize: function(){
         var _this = this;
         var configlet = this.Configlet = $('#'+HG.WebApp.SystemSettings.PageId).find('[data-configlet-id="'+this.Id+'"]');
@@ -41,7 +41,7 @@ HG.WebApp.SystemSettings.Interfaces['Example.InterfaceSkelton'] = {
         // English is the default locale
         var defaultLocale = {
             "title": 
-                "Example Interface"
+                "WiFI Thermostat Interface"
         };
         HG.WebApp.Locales.LocalizeElement(this.Configlet, defaultLocale);
         this.Locale = defaultLocale;

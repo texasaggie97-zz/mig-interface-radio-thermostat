@@ -54,7 +54,7 @@
     <Compile Include="DeviceHolder.cs" />
     <Compile Include="Utility.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="InterfaceRadioThermostat.cs" />
+    <Compile Include="RadioThermostat.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>

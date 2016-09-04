@@ -39,7 +39,7 @@ using System.Globalization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MIG.Interfaces.RadioThermostat
+namespace MIG.Interfaces.HomeAutomation
 {
     /// <summary>
     /// Net Helper class.\n
