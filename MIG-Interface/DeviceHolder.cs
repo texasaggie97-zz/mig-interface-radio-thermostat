@@ -15,35 +15,6 @@ namespace MIG.Interfaces.HomeAutomation
 {
     public static class Extensions
     {
-        public static string GetDomain(this DeviceHolder holder)
-        {
-            string domain = holder.GetType().Namespace.ToString();
-            domain = domain.Substring(domain.LastIndexOf(".") + 1) + "." + holder.GetType().Name.ToString();
-            return domain;
-        }
-
-        public static DeviceOption GetOption(this DeviceHolder holder, string option)
-        {
-            if (holder.Options != null)
-            {
-                return holder.Options.Find(o => o.Name == option);
-            }
-            return null;
-        }
-
-        public static void SetOption(this DeviceHolder holder, string option, dynamic value)
-        {
-            MigService.Log.Trace("{0}: {1}={2}", holder.GetDomain(), option, value);
-            var opt = holder.GetOption(option);
-            if (opt == null)
-            {
-                opt = new DeviceOption(option, value);
-                holder.Options.Add(opt);
-            }
-            opt.Value = value;
-            //holder.OnSetOption(opt);
-        }
-
         public static string GetSetPointSetting(ThermostatSetPoint mode)
         {
             string modeSetting;
@@ -246,7 +217,14 @@ namespace MIG.Interfaces.HomeAutomation
             "Receiver.Status";
         public static string Thermostat_FanMode =
             "Thermostat.FanMode";
-
+        public static string Thermostat_Mode = 
+            "Thermostat.Mode";
+        public static string Thermostat_OperatingState =
+            "Thermostat.OperatingState";
+        public static string Thermostat_SetPoint =
+            "Thermostat.SetPoint.";
+        public static string Thermostat_FanState =
+            "Thermostat.FanState";
     }
 
 
@@ -281,7 +259,6 @@ namespace MIG.Interfaces.HomeAutomation
         public ResponseText Control(MigInterfaceCommand request)
         {
             var response = new ResponseText("OK"); //default success value
-            bool raiseEvent = false;
             string eventParameter = ModuleEvents.Status_Level;
             string eventValue = "";
 
@@ -291,16 +268,13 @@ namespace MIG.Interfaces.HomeAutomation
             switch (command)
             {
                 case Commands.Thermostat_ModeGet:
-                    response = new ResponseText(Extensions.GetOption(this, "tmode").Value.ToString());
+                    response = new ResponseText(GetOption("tmode").Value.ToString());
                     break;
                 case Commands.Thermostat_ModeSet:
                     {
                         ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
                         response = TStatPost(null, "tmode", mode);
-                        raiseEvent = true;
-                        eventParameter = "Thermostat.Mode";
-                        eventValue = request.GetOption(0);
-                        Extensions.SetOption(this, "tmode", mode);
+                        SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
                     }
                     break;
                 case Commands.Thermostat_SetPointGet:
@@ -313,7 +287,7 @@ namespace MIG.Interfaces.HomeAutomation
                         else
                         {
                             string modeSetting = Extensions.GetSetPointSetting(mode);
-                            response = new ResponseText(Extensions.GetOption(this, modeSetting).Value.ToString());
+                            response = new ResponseText(GetOption(modeSetting).Value.ToString());
                         }
                     }
                     break;
@@ -329,15 +303,14 @@ namespace MIG.Interfaces.HomeAutomation
                             string modeSetting = Extensions.GetSetPointSetting(mode);
                             double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
                             response = TStatPost(null, modeSetting, temperature);
-                            raiseEvent = true;
-                            eventParameter = "Thermostat.SetPoint." + request.GetOption(0);
+                            eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
                             eventValue = temperature.ToString(CultureInfo.InvariantCulture);
-                            Extensions.SetOption(this, modeSetting, temperature);
+                            SetOption(modeSetting, temperature, eventParameter, eventValue);
                         }
                     }
                     break;
                 case Commands.Thermostat_FanModeGet:
-                    response = new ResponseText(Extensions.GetOption(this, "fmode").Value.ToString());
+                    response = new ResponseText(GetOption("fmode").Value.ToString());
                     break;
                 case Commands.Thermostat_FanModeSet:
                     {
@@ -350,31 +323,24 @@ namespace MIG.Interfaces.HomeAutomation
                         {
                             int modeSetting = ConvertFanModeFromHG(mode);
                             response = TStatPost(null, "fmode", modeSetting);
-                            raiseEvent = true;
                             eventParameter = ModuleEvents.Thermostat_FanMode;
-                            eventValue = mode.ToString();
-                            Extensions.SetOption(this, "fmode", mode);
+                            SetOption("fmode", mode, eventParameter);
                         }
                     }
                     break;
                 case Commands.Thermostat_FanStateGet:
-                    response = new ResponseText(Extensions.GetOption(this, "fstate").Value.ToString());
+                    response = new ResponseText(GetOption("fstate").Value.ToString());
                     break;
                 case Commands.Thermostat_OperatingStateGet:
-                    response = new ResponseText(Extensions.GetOption(this, "tstate").Value.ToString());
+                    response = new ResponseText(GetOption("tstate").Value.ToString());
                     break;
                 case Commands.SensorMultiLevel_Get:
-                    response = new ResponseText(Extensions.GetOption(this, "temp").Value.ToString());
+                    response = new ResponseText(GetOption("temp").Value.ToString());
                     break;
                 default:
                     response = new ResponseText("ERROR: Unknown command: " + request.Command);
                     break;
 
-            }
-
-            if (raiseEvent)
-            {
-                Parent.OnInterfacePropertyChanged(this.GetDomain(), ModuleAddress, "Radio Thermostat Node", eventParameter, eventValue);
             }
 
             return response;
@@ -390,24 +356,26 @@ namespace MIG.Interfaces.HomeAutomation
 
                 if (IsSimulated)
                 {
-                    Extensions.SetOption(this, "temp", 77.0);
-                    // Parent.OnInterfacePropertyChanged(this.GetDomain(), ModuleAddress, "Radio Thermostat Node", ModuleEvents.Sensor_Temperature, "77.0");
-                    Extensions.SetOption(this, "tmode", ThermostatMode.Cool);
-                    Extensions.SetOption(this, "tstate", ThermostatOperatingState.Cooling);
-                    Extensions.SetOption(this, "fmode", ThermostatFanMode.AutoHigh);
-                    Extensions.SetOption(this, "fstate", ThermostatFanState.RunningHigh);
-                    Extensions.SetOption(this, "override", State.DISABLED);
-                    Extensions.SetOption(this, "hold", State.DISABLED);
-                    Extensions.SetOption(this, "t_heat", 0.0);
-                    Extensions.SetOption(this, "t_cool", 76.0);
-                    Extensions.SetOption(this, "ttarget", Extensions.GetOption(this, "tmode").Value);
+                    double temperature = 77.0;
+                    SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+                    SetOption("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
+                    SetOption("tstate", ThermostatOperatingState.Cooling, ModuleEvents.Thermostat_OperatingState);
+                    SetOption("fmode", ThermostatFanMode.AutoHigh, ModuleEvents.Thermostat_FanMode);
+                    SetOption("fstate", ThermostatFanState.RunningHigh, ModuleEvents.Thermostat_FanState);
+                    SetOption("override", State.DISABLED, null);
+                    SetOption("hold", State.DISABLED, null);
+                    temperature = 0.0;
+                    SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+                    temperature = 76.0;
+                    SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                    SetOption("ttarget", GetOption("tmode").Value, null);
                 }
                 else
                 {
                     Update();
                     var tstat = TStatCall("model");
-                    Extensions.SetOption(this, "model", tstat.model.ToString());
-                    MigService.Log.Debug(String.Format("WiFI Thermostat found. Model: {0}", Extensions.GetOption(this, "model").Value));
+                    SetOption("model", tstat.model.ToString(), null);
+                    MigService.Log.Debug(String.Format("WiFI Thermostat found. Model: {0}", GetOption("model").Value));
                 }
             }
             catch (Exception ex)
@@ -480,37 +448,42 @@ namespace MIG.Interfaces.HomeAutomation
             string webservicebaseurl = "http://" + Address + "/tstat";
             var tstat = TStatCall();
 
-            Extensions.SetOption(this, "temp", double.Parse(tstat.temp.ToString()));
-            Extensions.SetOption(this, "tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()));
-            Extensions.SetOption(this, "tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())));
-            Extensions.SetOption(this, "fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())));
-            Extensions.SetOption(this, "fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())));
-            Extensions.SetOption(this, "override", (State)int.Parse(tstat.fmode.ToString()));
-            Extensions.SetOption(this, "hold", (State)int.Parse(tstat.fmode.ToString()));
+            double temperature = double.Parse(tstat.temp.ToString());
+            SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+            SetOption("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
+            SetOption("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
+            SetOption("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
+            SetOption("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
+            SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
+            SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
 
             if (HasProperty(tstat, "t_heat"))
             {
-                Extensions.SetOption(this, "t_heat", double.Parse(tstat.t_heat.ToString()));
+                temperature = double.Parse(tstat.t_heat.ToString());
             }
             else
             {
-                Extensions.SetOption(this, "t_heat", 0.0);
+                temperature = 0.0;
             }
+            SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+            
             if (HasProperty(tstat, "t_cool"))
             {
-                Extensions.SetOption(this, "t_cool", double.Parse(tstat.t_cool.ToString()));
+                temperature = double.Parse(tstat.t_cool.ToString());
             }
             else
             {
-                Extensions.SetOption(this, "t_cool", 0.0);
+                temperature = 0.0;
             }
+            SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+
             if (HasProperty(tstat, "ttarget"))
             {
-                Extensions.SetOption(this, "ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()));
+                SetOption("ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()), null);
             }
             else
             {
-                Extensions.SetOption(this, "ttarget", Extensions.GetOption(this, "tmode").Value);
+                SetOption("ttarget", GetOption("tmode").Value, null);
             }
         }
 
@@ -544,6 +517,54 @@ namespace MIG.Interfaces.HomeAutomation
                 response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Resource, Value)).Call());
             }
             return response;
+        }
+
+        public string GetDomain()
+        {
+            string domain = GetType().Namespace.ToString();
+            domain = domain.Substring(domain.LastIndexOf(".") + 1) + "." + GetType().Name.ToString();
+            return domain;
+        }
+
+        public DeviceOption GetOption(string option)
+        {
+            if (Options != null)
+            {
+                return Options.Find(o => o.Name == option);
+            }
+            return null;
+        }
+
+        public void SetOption(string option, dynamic value, string eventParameter, string eventValue = null)
+        {
+            MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
+            var opt = GetOption(option);
+            bool raiseEvent = false;
+            if (opt == null)
+            {
+                opt = new DeviceOption(option, value);
+                Options.Add(opt);
+                raiseEvent = true;
+            }
+            if (opt.Value != value)
+            {
+                raiseEvent = true;
+            }
+            opt.Value = value;
+            if (raiseEvent && eventParameter != null)
+            {
+                string e;
+                if (eventValue == null)
+                {
+                    e = value.ToString();
+                }
+                else
+                {
+                    e = eventValue;
+                }
+                Parent.OnInterfacePropertyChanged(GetDomain(), ModuleAddress, "Radio Thermostat Node", eventParameter, e);
+            }
+            //holder.OnSetOption(opt);
         }
 
         #endregion
