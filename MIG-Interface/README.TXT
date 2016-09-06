@@ -1,6 +1,6 @@
-﻿Basic skelton project for writing a new MIG / HomeGenie interface driver
+﻿MIG Interface driver for WiFi enabled Radio Thermostats
 ---
-Version: 1.1 (2016-01-22)
+Version: 0.1 (2016-09-05)
 License: GPL-3
-Author: genielabs
-Source: https://github.com/genielabs/mig-interface-skelton
+Author: Mark Silva
+Source: https://github.com/texasaggie97/mig-interface-radio-thermostat
