@@ -348,12 +348,13 @@ namespace MIG.Interfaces.HomeAutomation
         }
 
 
-        public void Initialize(IPAddress address, RadioThermostat parent)
+        public void Connect(IPAddress address, RadioThermostat parent)
         {
             try
             {
                 this.Address = address;
                 this.Parent = parent;
+                this.IsActive = true;
 
                 if (IsSimulated)
                 {
@@ -385,6 +386,10 @@ namespace MIG.Interfaces.HomeAutomation
             }
         }
 
+        public void Disconnect()
+        {
+            this.IsActive = false;
+        }
         #region Helper functions
 
         private static bool HasProperty(dynamic obj, string name)
@@ -441,51 +446,59 @@ namespace MIG.Interfaces.HomeAutomation
             return ThermostatOperatingState.Idle;
         }
 
+        private bool IsActive { get; set; }
         private void Update()
         {
-            if (IsSimulated)
-                return;
+            Thread.Sleep(100);
 
-            string webservicebaseurl = "http://" + Address + "/tstat";
-            var tstat = TStatCall();
+            Utility.RunAsyncTask(() =>
+                {
+                    while (IsActive)
+                    {
+                        string webservicebaseurl = "http://" + Address + "/tstat";
+                        var tstat = TStatCall();
 
-            double temperature = double.Parse(tstat.temp.ToString());
-            SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
-            SetOption("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
-            SetOption("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
-            SetOption("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
-            SetOption("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
-            SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
-            SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
+                        double temperature = convertFtoC(double.Parse(tstat.temp.ToString()));
+                        SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+                        SetOption("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
+                        SetOption("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
+                        SetOption("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
+                        SetOption("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
+                        SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
+                        SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
 
-            if (HasProperty(tstat, "t_heat"))
-            {
-                temperature = double.Parse(tstat.t_heat.ToString());
-            }
-            else
-            {
-                temperature = 0.0;
-            }
-            SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-            
-            if (HasProperty(tstat, "t_cool"))
-            {
-                temperature = double.Parse(tstat.t_cool.ToString());
-            }
-            else
-            {
-                temperature = 0.0;
-            }
-            SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                        if (HasProperty(tstat, "t_heat"))
+                        {
+                            temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
+                        }
+                        else
+                        {
+                            temperature = 0.0;
+                        }
+                        SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
 
-            if (HasProperty(tstat, "ttarget"))
-            {
-                SetOption("ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()), null);
-            }
-            else
-            {
-                SetOption("ttarget", GetOption("tmode").Value, null);
-            }
+                        if (HasProperty(tstat, "t_cool"))
+                        {
+                            temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
+                        }
+                        else
+                        {
+                            temperature = 0.0;
+                        }
+                        SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+
+                        if (HasProperty(tstat, "ttarget"))
+                        {
+                            SetOption("ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()), null);
+                        }
+                        else
+                        {
+                            SetOption("ttarget", GetOption("tmode").Value, null);
+                        }
+
+                        Thread.Sleep(5000);
+                    }
+                });
         }
 
         private string GetJsonString(string item, dynamic value)
@@ -515,15 +528,15 @@ namespace MIG.Interfaces.HomeAutomation
             }
             if (!IsSimulated)
             {
-                response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Resource, Value)).Call());
+                response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Item, Value)).Call());
             }
             return response;
         }
 
         public string GetDomain()
         {
-            string domain = GetType().Namespace.ToString();
-            domain = domain.Substring(domain.LastIndexOf(".") + 1) + "." + GetType().Name.ToString();
+            string domain = Parent.GetType().Namespace.ToString();
+            domain = domain.Substring(domain.LastIndexOf(".") + 1) + "." + Parent.GetType().Name.ToString();
             return domain;
         }
 
@@ -540,7 +553,7 @@ namespace MIG.Interfaces.HomeAutomation
         {
             MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
             var opt = GetOption(option);
-            bool raiseEvent = false;
+            bool raiseEvent = true;
             if (opt == null)
             {
                 opt = new DeviceOption(option, value);
