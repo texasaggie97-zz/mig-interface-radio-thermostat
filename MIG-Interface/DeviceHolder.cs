@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Net;
 using System.Globalization;
 
@@ -302,7 +303,7 @@ namespace MIG.Interfaces.HomeAutomation
                         {
                             string modeSetting = Extensions.GetSetPointSetting(mode);
                             double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
-                            response = TStatPost(null, modeSetting, temperature);
+                            response = TStatPost(null, modeSetting, convertCtoF(temperature));
                             eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
                             eventValue = temperature.ToString(CultureInfo.InvariantCulture);
                             SetOption(modeSetting, temperature, eventParameter, eventValue);
@@ -356,7 +357,7 @@ namespace MIG.Interfaces.HomeAutomation
 
                 if (IsSimulated)
                 {
-                    double temperature = 77.0;
+                    double temperature = convertFtoC(77.0);
                     SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
                     SetOption("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
                     SetOption("tstate", ThermostatOperatingState.Cooling, ModuleEvents.Thermostat_OperatingState);
@@ -366,7 +367,7 @@ namespace MIG.Interfaces.HomeAutomation
                     SetOption("hold", State.DISABLED, null);
                     temperature = 0.0;
                     SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-                    temperature = 76.0;
+                    temperature = convertFtoC(76.0);
                     SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
                     SetOption("ttarget", GetOption("tmode").Value, null);
                 }
@@ -565,6 +566,16 @@ namespace MIG.Interfaces.HomeAutomation
                 Parent.OnInterfacePropertyChanged(GetDomain(), ModuleAddress, "Radio Thermostat Node", eventParameter, e);
             }
             //holder.OnSetOption(opt);
+        }
+
+        private double convertFtoC(double F)
+        {
+            return (F - 32) / 1.8;
+        }
+
+        private double convertCtoF(double C)
+        {
+            return C * 1.8 + 32;
         }
 
         #endregion
