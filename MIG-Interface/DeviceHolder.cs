@@ -276,6 +276,7 @@ namespace MIG.Interfaces.HomeAutomation
                         ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
                         response = TStatPost(null, "tmode", mode);
                         SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
+                        Update();
                     }
                     break;
                 case Commands.Thermostat_SetPointGet:
@@ -307,6 +308,7 @@ namespace MIG.Interfaces.HomeAutomation
                             eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
                             eventValue = temperature.ToString(CultureInfo.InvariantCulture);
                             SetOption(modeSetting, temperature, eventParameter, eventValue);
+                            Update();
                         }
                     }
                     break;
@@ -326,6 +328,7 @@ namespace MIG.Interfaces.HomeAutomation
                             response = TStatPost(null, "fmode", modeSetting);
                             eventParameter = ModuleEvents.Thermostat_FanMode;
                             SetOption("fmode", mode, eventParameter);
+                            Update();
                         }
                     }
                     break;
@@ -358,26 +361,30 @@ namespace MIG.Interfaces.HomeAutomation
 
                 if (IsSimulated)
                 {
-                    double temperature = convertFtoC(77.0);
-                    SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
-                    SetOption("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
-                    SetOption("tstate", ThermostatOperatingState.Cooling, ModuleEvents.Thermostat_OperatingState);
-                    SetOption("fmode", ThermostatFanMode.AutoHigh, ModuleEvents.Thermostat_FanMode);
-                    SetOption("fstate", ThermostatFanState.RunningHigh, ModuleEvents.Thermostat_FanState);
-                    SetOption("override", State.DISABLED, null);
-                    SetOption("hold", State.DISABLED, null);
-                    temperature = 0.0;
-                    SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-                    temperature = convertFtoC(76.0);
-                    SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
-                    SetOption("ttarget", GetOption("tmode").Value, null);
+                    // We acquire the lock and then call the NoLock version for performance
+                    lock (OptionsLock)
+                    {
+                        double temperature = convertFtoC(77.0);
+                        SetOptionNoLock("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+                        SetOptionNoLock("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
+                        SetOptionNoLock("tstate", ThermostatOperatingState.Cooling, ModuleEvents.Thermostat_OperatingState);
+                        SetOptionNoLock("fmode", ThermostatFanMode.AutoHigh, ModuleEvents.Thermostat_FanMode);
+                        SetOptionNoLock("fstate", ThermostatFanState.RunningHigh, ModuleEvents.Thermostat_FanState);
+                        SetOptionNoLock("override", State.DISABLED, null);
+                        SetOptionNoLock("hold", State.DISABLED, null);
+                        temperature = convertFtoC(65.0);
+                        SetOptionNoLock("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+                        temperature = convertFtoC(76.0);
+                        SetOptionNoLock("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                        SetOptionNoLock("ttarget", GetOption("tmode").Value, null);
+                    }
                 }
                 else
                 {
-                    Update();
                     var tstat = TStatCall("model");
                     SetOption("model", tstat.model.ToString(), null);
                     MigService.Log.Debug(String.Format("WiFI Thermostat found. Model: {0}", GetOption("model").Value));
+                    BackgroundUpdate();
                 }
             }
             catch (Exception ex)
@@ -447,58 +454,72 @@ namespace MIG.Interfaces.HomeAutomation
         }
 
         private bool IsActive { get; set; }
-        private void Update()
-        {
-            Thread.Sleep(100);
 
+        private Object OptionsLock = new Object();
+        private Object TstatLock = new Object();
+
+        private void BackgroundUpdate()
+        {
             Utility.RunAsyncTask(() =>
                 {
                     while (IsActive)
                     {
-                        string webservicebaseurl = "http://" + Address + "/tstat";
-                        var tstat = TStatCall();
-
-                        double temperature = convertFtoC(double.Parse(tstat.temp.ToString()));
-                        SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
-                        SetOption("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
-                        SetOption("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
-                        SetOption("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
-                        SetOption("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
-                        SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
-                        SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
-
-                        if (HasProperty(tstat, "t_heat"))
-                        {
-                            temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
-                        }
-                        else
-                        {
-                            temperature = 0.0;
-                        }
-                        SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-
-                        if (HasProperty(tstat, "t_cool"))
-                        {
-                            temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
-                        }
-                        else
-                        {
-                            temperature = 0.0;
-                        }
-                        SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
-
-                        if (HasProperty(tstat, "ttarget"))
-                        {
-                            SetOption("ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()), null);
-                        }
-                        else
-                        {
-                            SetOption("ttarget", GetOption("tmode").Value, null);
-                        }
-
-                        Thread.Sleep(5000);
+                        Update();
+                        Thread.Sleep(10000);
                     }
                 });
+        }
+
+        private void Update()
+        {
+            if (IsSimulated)
+                return;
+
+            // Wait 1 second before querying the thermostat
+            string webservicebaseurl = "http://" + Address + "/tstat";
+            var tstat = TStatCall();
+
+            // We acquire the lock and then call the NoLock version for performance
+            lock (OptionsLock)
+            {
+                double temperature = convertFtoC(double.Parse(tstat.temp.ToString()));
+                SetOptionNoLock("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+                SetOptionNoLock("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
+                SetOptionNoLock("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
+                SetOptionNoLock("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
+                SetOptionNoLock("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
+                SetOptionNoLock("override", (State)int.Parse(tstat.fmode.ToString()), null);
+                SetOptionNoLock("hold", (State)int.Parse(tstat.fmode.ToString()), null);
+
+                if (HasProperty(tstat, "t_heat"))
+                {
+                    temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
+                }
+                else
+                {
+                    temperature = convertFtoC(65.0);
+                }
+                SetOptionNoLock("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+
+                if (HasProperty(tstat, "t_cool"))
+                {
+                    temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
+                }
+                else
+                {
+                    temperature =convertFtoC(85.0);
+                }
+                SetOptionNoLock("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+
+                if (HasProperty(tstat, "ttarget"))
+                {
+                    SetOptionNoLock("ttarget", (ThermostatMode)int.Parse(tstat.ttarget.ToString()), null);
+                }
+                else
+                {
+                    SetOptionNoLock("ttarget", GetOption("tmode").Value, null);
+                }
+            }
         }
 
         private string GetJsonString(string item, dynamic value)
@@ -509,28 +530,38 @@ namespace MIG.Interfaces.HomeAutomation
         // Don't call if simulated
         private dynamic TStatCall(string Resource = null)
         {
-            string webservicebaseurl = "http://" + Address + "/tstat";
-            if (Resource != null)
+            lock (TstatLock)
             {
-                webservicebaseurl += "/" + Resource;
+                string webservicebaseurl = "http://" + Address + "/tstat";
+                if (Resource != null)
+                {
+                    webservicebaseurl += "/" + Resource;
+                }
+                var tstat = Net.WebService(webservicebaseurl).GetData();
+                return tstat;
             }
-            var tstat = Net.WebService(webservicebaseurl).GetData();
-            return tstat;
         }
 
         private ResponseText TStatPost(string Resource, string Item, dynamic Value)
         {
-            string webservicebaseurl = "http://" + Address + "/tstat";
-            ResponseText response = new ResponseText("OK");
-            if (Resource != null)
+            lock (TstatLock)
             {
-                webservicebaseurl += "/" + Resource;
+                string webservicebaseurl = "http://" + Address + "/tstat";
+                ResponseText response = new ResponseText("OK");
+                if (Resource != null)
+                {
+                    webservicebaseurl += "/" + Resource;
+                }
+                if (!IsSimulated)
+                {
+                    response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Item, Value)).Call());
+                    // We are going to wait a bit less that 1 second to allow the thermostat to respond to
+                    // any new values. We do this wait in the lock section so that we prevent another thread
+                    // from querying the thermostat before it has had a chance to make any required adjustments.
+                    Thread.Sleep(800);
+                }
+                return response;
             }
-            if (!IsSimulated)
-            {
-                response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Item, Value)).Call());
-            }
-            return response;
         }
 
         public string GetDomain()
@@ -542,6 +573,23 @@ namespace MIG.Interfaces.HomeAutomation
 
         public DeviceOption GetOption(string option)
         {
+            lock(OptionsLock)
+            {
+                return GetOptionNoLock(option);
+            }
+        }
+
+        public void SetOption(string option, dynamic value, string eventParameter, string eventValue = null)
+        { 
+            lock(OptionsLock)
+            {
+                SetOptionNoLock(option, value, eventParameter, eventValue);
+            }
+        }
+
+        // NoLock versions expect lock to be acquired before calling
+        private DeviceOption GetOptionNoLock(string option)
+        {
             if (Options != null)
             {
                 return Options.Find(o => o.Name == option);
@@ -549,10 +597,10 @@ namespace MIG.Interfaces.HomeAutomation
             return null;
         }
 
-        public void SetOption(string option, dynamic value, string eventParameter, string eventValue = null)
+        private void SetOptionNoLock(string option, dynamic value, string eventParameter, string eventValue = null)
         {
             MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
-            var opt = GetOption(option);
+            var opt = GetOptionNoLock(option);
             bool raiseEvent = true;
             if (opt == null)
             {
@@ -583,12 +631,12 @@ namespace MIG.Interfaces.HomeAutomation
 
         private double convertFtoC(double F)
         {
-            return (F - 32) / 1.8;
+            return Math.Round((F - 32) / 1.8, 1);
         }
 
         private double convertCtoF(double C)
         {
-            return C * 1.8 + 32;
+            return Math.Round(C * 1.8 + 32, 1);
         }
 
         #endregion
