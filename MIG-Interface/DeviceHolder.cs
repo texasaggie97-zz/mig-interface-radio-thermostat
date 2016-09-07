@@ -599,18 +599,19 @@ namespace MIG.Interfaces.HomeAutomation
 
         private void SetOptionNoLock(string option, dynamic value, string eventParameter, string eventValue = null)
         {
-            MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
             var opt = GetOptionNoLock(option);
-            bool raiseEvent = true;
+            bool raiseEvent = false;
             if (opt == null)
             {
                 opt = new DeviceOption(option, value);
                 Options.Add(opt);
                 raiseEvent = true;
+                MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
             }
             if (opt.Value != value)
             {
                 raiseEvent = true;
+                MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
             }
             opt.Value = value;
             if (raiseEvent && eventParameter != null)
