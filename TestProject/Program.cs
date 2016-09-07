@@ -23,6 +23,7 @@
 using System;
 using System.IO;
 using System.Xml.Serialization;
+using System.Threading;
 
 using MIG;
 using MIG.Config;
@@ -66,6 +67,7 @@ namespace TestProject
             migService.Configuration = configuration;
             migService.StartService();
 
+            Thread.Sleep(10000);
             // Get a reference to the test interface
             var interfaceDomain = "HomeAutomation.RadioThermostat";
             var migInterface = migService.GetInterface(interfaceDomain);
@@ -79,17 +81,17 @@ namespace TestProject
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.ModeGet"));
             CheckValue((ResponseText)response, "Heat");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointGet/Heating"));
-            CheckValue((ResponseText)response, "0");
+            CheckValue((ResponseText)response, "18.3");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointGet/Cooling"));
-            CheckValue((ResponseText)response, "76");
+            CheckValue((ResponseText)response, "24.4");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointGet/Furnace"));
             CheckValue((ResponseText)response, "Mode not supported: Furnace");
-            response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointSet/Cooling/78.0"));
+            response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointSet/Cooling/24.0"));
             CheckValue((ResponseText)response, "OK");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointGet/Heating"));
-            CheckValue((ResponseText)response, "0");
+            CheckValue((ResponseText)response, "18.3");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.SetPointGet/Cooling"));
-            CheckValue((ResponseText)response, "78");
+            CheckValue((ResponseText)response, "24");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.FanModeGet"));
             CheckValue((ResponseText)response, "AutoHigh");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.FanModeSet/OnLow"));
@@ -103,7 +105,7 @@ namespace TestProject
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/Thermostat.OperatingStateGet"));
             CheckValue((ResponseText)response, "Cooling");
             response = migInterface.InterfaceControl(new MigInterfaceCommand(interfaceDomain + "/" + modAddress + "/SensorMultiLevel.Get"));
-            CheckValue((ResponseText)response, "77");
+            CheckValue((ResponseText)response, "25");
             // <module_domain> ::= "Example.InterfaceSkelton"
             // <module_address> ::= "3"
             // <command> ::= "Greet.Hello"
@@ -125,6 +127,8 @@ namespace TestProject
             
             Console.WriteLine("\n[Press Enter to Quit]\n");
             Console.ReadLine();
+
+            migService.StopService();
         }
     }
 }
