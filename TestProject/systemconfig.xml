@@ -10,7 +10,7 @@
     </Gateway>
 </Gateways>
 <Interfaces>
-  <Interface Domain="HomeAutomation.RadioThermostat" IsEnabled="true" AssemblyName="MIG-RadioThermostat.dll" SupportedPlatform="All">
+  <Interface Domain="HomeAutomation.RadioThermostat" IsEnabled="true" AssemblyName="RadioThermostat" SupportedPlatform="All">
     <Description>Radio Thermostat</Description>
     <Options />
   </Interface>
