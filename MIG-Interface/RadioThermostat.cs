@@ -163,36 +163,33 @@ namespace MIG.Interfaces.HomeAutomation
                 isConnected = true;
             }
 
-            Utility.RunAsyncTask(() =>
-                {
-                    List<IPAddress> thermostats = GetThermostats();
-                    foreach (IPAddress ipa in thermostats)
-                    {
-                        byte[] b = ipa.GetAddressBytes();
-                        var mod = new InterfaceModule();
-                        mod.Domain = this.GetDomain();
-                        mod.Address = Convert.ToString(b[3]);
-                        mod.ModuleType = ModuleTypes.Thermostat;
-                        mod.Description = "Radio Thermostat";
-                        DeviceHolder dev = new DeviceHolder(false, mod.Address);
-                        dev.Connect(ipa, this);
-                        mod.CustomData = dev;
-                        modules.Add(mod);
-                    }
+            List<IPAddress> thermostats = GetThermostats();
+            foreach (IPAddress ipa in thermostats)
+            {
+                byte[] b = ipa.GetAddressBytes();
+                var mod = new InterfaceModule();
+                mod.Domain = this.GetDomain();
+                mod.Address = Convert.ToString(b[3]);
+                mod.ModuleType = ModuleTypes.Thermostat;
+                mod.Description = "Radio Thermostat";
+                DeviceHolder dev = new DeviceHolder(false, mod.Address);
+                dev.Connect(ipa, this);
+                mod.CustomData = dev;
+                modules.Add(mod);
+            }
 
-                    if (AddSimulationDevice)
-                    {
-                        var mod = new InterfaceModule();
-                        mod.Domain = this.GetDomain();
-                        mod.Address = "256"; // Invalid ip
-                        mod.ModuleType = ModuleTypes.Thermostat;
-                        mod.Description = "Radio Thermostat Simulated Device";
-                        DeviceHolder dev = new DeviceHolder(true, mod.Address);
-                        dev.Connect(IPAddress.Any, this);
-                        mod.CustomData = dev;
-                        modules.Add(mod);
-                    }
-                });
+            if (AddSimulationDevice)
+            {
+                var mod = new InterfaceModule();
+                mod.Domain = this.GetDomain();
+                mod.Address = "256"; // Invalid ip
+                mod.ModuleType = ModuleTypes.Thermostat;
+                mod.Description = "Radio Thermostat Simulated Device";
+                DeviceHolder dev = new DeviceHolder(true, mod.Address);
+                dev.Connect(IPAddress.Any, this);
+                mod.CustomData = dev;
+                modules.Add(mod);
+            }
 
             OnInterfaceModulesChanged(this.GetDomain());
             return true;
