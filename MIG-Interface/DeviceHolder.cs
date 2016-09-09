@@ -349,7 +349,7 @@ namespace MIG.Interfaces.HomeAutomation
         // Don't call if simulated
         private dynamic TStatCall(string Resource = null)
         {
-            lock (TstatLock)
+            //lock (TstatLock)
             {
                 string webservicebaseurl = "http://" + Address + "/tstat";
                 if (Resource != null)
@@ -363,7 +363,7 @@ namespace MIG.Interfaces.HomeAutomation
 
         private ResponseText TStatPost(string Resource, string Item, dynamic Value)
         {
-            lock (TstatLock)
+            //lock (TstatLock)
             {
                 string webservicebaseurl = "http://" + Address + "/tstat";
                 ResponseText response = new ResponseText("OK");
@@ -377,7 +377,7 @@ namespace MIG.Interfaces.HomeAutomation
                     // We are going to wait a bit less that 1 second to allow the thermostat to respond to
                     // any new values. We do this wait in the lock section so that we prevent another thread
                     // from querying the thermostat before it has had a chance to make any required adjustments.
-                    Thread.Sleep(800);
+                    //Thread.Sleep(800);
                 }
                 return response;
             }
@@ -392,7 +392,7 @@ namespace MIG.Interfaces.HomeAutomation
 
         public DeviceOption GetOption(string option)
         {
-            lock(OptionsLock)
+            //lock(OptionsLock)
             {
                 return GetOptionNoLock(option);
             }
@@ -400,7 +400,7 @@ namespace MIG.Interfaces.HomeAutomation
 
         public void SetOption(string option, dynamic value, string eventParameter, string eventValue = null)
         { 
-            lock(OptionsLock)
+            //lock(OptionsLock)
             {
                 SetOptionNoLock(option, value, eventParameter, eventValue);
             }
