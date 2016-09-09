@@ -116,4 +116,50 @@ namespace MIG.Interfaces.HomeAutomation
         SensorMultiLevel_Get,
 
     }
+
+    public class EnumConversion
+    {
+        public static ThermostatFanMode ConvertFanModeToHG(int FanMode)
+        {
+            if (FanMode == 0)
+                return ThermostatFanMode.AutoHigh;
+            if (FanMode == 1)
+                return ThermostatFanMode.Circulate;
+            if (FanMode == 2)
+                return ThermostatFanMode.OnHigh;
+            return ThermostatFanMode.AutoHigh;
+        }
+
+        public static int ConvertFanModeFromHG(ThermostatFanMode FanMode)
+        {
+            if (FanMode == ThermostatFanMode.AutoHigh)
+                return 0;
+            if (FanMode == ThermostatFanMode.Circulate)
+                return 1;
+            if (FanMode == ThermostatFanMode.OnHigh)
+                return 2;
+            return 0;
+        }
+
+        public static ThermostatFanState ConvertFanStateToHG(int FanState)
+        {
+            if (FanState == 0)
+                return ThermostatFanState.Idle;
+            if (FanState == 1)
+                return ThermostatFanState.RunningHigh;
+            return ThermostatFanState.RunningHigh;
+        }
+
+        public static ThermostatOperatingState ConvertThermostatStateToHG(int TState)
+        {
+            if (TState == 0)
+                return ThermostatOperatingState.Idle;
+            if (TState == 1)
+                return ThermostatOperatingState.Heating;
+            if (TState == 2)
+                return ThermostatOperatingState.Cooling;
+            return ThermostatOperatingState.Idle;
+        }
+
+    }
 }

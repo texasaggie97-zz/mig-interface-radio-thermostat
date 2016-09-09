@@ -143,7 +143,7 @@ namespace MIG.Interfaces.HomeAutomation
                         }
                         else
                         {
-                            int modeSetting = ConvertFanModeFromHG(mode);
+                            int modeSetting = EnumConversion.ConvertFanModeFromHG(mode);
                             response = TStatPost(null, "fmode", modeSetting);
                             eventParameter = ModuleEvents.Thermostat_FanMode;
                             SetOption("fmode", mode, eventParameter);
@@ -227,48 +227,6 @@ namespace MIG.Interfaces.HomeAutomation
             return objType.GetProperty(name) != null;
         }
 
-        private static ThermostatFanMode ConvertFanModeToHG(int FanMode)
-        {
-            if (FanMode == 0)
-                return ThermostatFanMode.AutoHigh;
-            if (FanMode == 1)
-                return ThermostatFanMode.Circulate;
-            if (FanMode == 2)
-                return ThermostatFanMode.OnHigh;
-            return ThermostatFanMode.AutoHigh;
-        }
-
-        private static int ConvertFanModeFromHG(ThermostatFanMode FanMode)
-        {
-            if (FanMode == ThermostatFanMode.AutoHigh)
-                return 0;
-            if (FanMode == ThermostatFanMode.Circulate)
-                return 1;
-            if (FanMode == ThermostatFanMode.OnHigh)
-                return 2;
-            return 0;
-        }
-
-        private static ThermostatFanState ConvertFanStateToHG(int FanState)
-        {
-            if (FanState == 0)
-                return ThermostatFanState.Idle;
-            if (FanState == 1)
-                return ThermostatFanState.RunningHigh;
-            return ThermostatFanState.RunningHigh;
-        }
-
-        private static ThermostatOperatingState ConvertThermostatStateToHG(int TState)
-        {
-            if (TState == 0)
-                return ThermostatOperatingState.Idle;
-            if (TState == 1)
-                return ThermostatOperatingState.Heating;
-            if (TState == 2)
-                return ThermostatOperatingState.Cooling;
-            return ThermostatOperatingState.Idle;
-        }
-
         private bool IsActive { get; set; }
 
         private Object OptionsLock = new Object();
@@ -299,9 +257,9 @@ namespace MIG.Interfaces.HomeAutomation
             double temperature = convertFtoC(double.Parse(tstat.temp.ToString()));
             SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
             SetOption("tmode", (ThermostatMode)int.Parse(tstat.tmode.ToString()), ModuleEvents.Thermostat_Mode);
-            SetOption("tstate", ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
-            SetOption("fmode", ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
-            SetOption("fstate", ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
+            SetOption("tstate", EnumConversion.ConvertThermostatStateToHG(int.Parse(tstat.tstate.ToString())), ModuleEvents.Thermostat_OperatingState);
+            SetOption("fmode", EnumConversion.ConvertFanModeToHG(int.Parse(tstat.fmode.ToString())), ModuleEvents.Thermostat_FanMode);
+            SetOption("fstate", EnumConversion.ConvertFanStateToHG(int.Parse(tstat.fstate.ToString())), ModuleEvents.Thermostat_FanState);
             SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
             SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
 
