@@ -159,7 +159,6 @@ namespace MIG.Interfaces.HomeAutomation
         {
             if (!isConnected)
             {
-//                OnInterfacePropertyChanged(this.GetDomain(), "IR", "LIRC Remote", "Receiver.RawData", codeparts[ 3 ].TrimEnd(new char[] { '\n', '\r' }) + "/" + codeparts[ 2 ]);
                 isConnected = true;
             }
 
