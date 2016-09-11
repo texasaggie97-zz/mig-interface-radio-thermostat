@@ -187,7 +187,6 @@ namespace MIG.Interfaces.HomeAutomation
             {
                 this.Address = address;
                 this.Parent = parent;
-                this.IsActive = true;
 
                 if (IsSimulated)
                 {
@@ -221,7 +220,7 @@ namespace MIG.Interfaces.HomeAutomation
 
         public void Disconnect()
         {
-            this.IsActive = false;
+            CancelEvent.Set();
         }
         #region Helper functions
 
@@ -237,22 +236,25 @@ namespace MIG.Interfaces.HomeAutomation
             return objType.GetProperty(name) != null;
         }
 
-        private bool IsActive { get; set; }
+        //private bool IsActive { get; set; }
 
         private Object TstatLock = new Object();
+
+        private static AutoResetEvent CancelEvent = new AutoResetEvent(false);
 
         private void BackgroundUpdate()
         {
             Utility.RunAsyncTask(() =>
                 {
-                    while (IsActive)
+                    bool cancelled = false;
+                    while (!cancelled)
                     {
                         lock (TstatLock)
                         {
                             Update();
                         }
                             
-                        Thread.Sleep(10000);
+                        cancelled = CancelEvent.WaitOne(10000);
                     }
                 });
         }
