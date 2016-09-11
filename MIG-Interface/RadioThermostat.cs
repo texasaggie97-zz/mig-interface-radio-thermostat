@@ -170,10 +170,10 @@ namespace MIG.Interfaces.HomeAutomation
                 mod.Domain = this.GetDomain();
                 mod.Address = Convert.ToString(b[3]);
                 mod.ModuleType = ModuleTypes.Thermostat;
-                mod.Description = "Radio Thermostat";
                 DeviceHolder dev = new DeviceHolder(false, mod.Address);
                 dev.Connect(ipa, this);
                 mod.CustomData = dev;
+                mod.Description = dev.Model;
                 modules.Add(mod);
             }
 
