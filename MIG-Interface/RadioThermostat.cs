@@ -236,8 +236,6 @@ namespace MIG.Interfaces.HomeAutomation
 
         #region Private members
 
-        // TODO: ....
-
         #region Events
 
         protected virtual void OnInterfaceModulesChanged(string domain)

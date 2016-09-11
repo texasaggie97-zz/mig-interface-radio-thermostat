@@ -85,85 +85,96 @@ namespace MIG.Interfaces.HomeAutomation
             Commands command;
             Enum.TryParse<Commands>(request.Command.Replace(".", "_"), out command);
 
-            switch (command)
+            lock (TstatLock)
             {
-                case Commands.Thermostat_ModeGet:
-                    response = new ResponseText(GetOption("tmode").Value.ToString());
-                    break;
-                case Commands.Thermostat_ModeSet:
-                    {
-                        ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
-                        response = TStatPost(null, "tmode", mode);
-                        SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
-                        Update();
-                    }
-                    break;
-                case Commands.Thermostat_SetPointGet:
-                    {
-                        ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
-                        if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
+                switch (command)
+                {
+                    case Commands.Thermostat_ModeGet:
+                        response = new ResponseText(GetOption("tmode").Value.ToString());
+                        break;
+                    case Commands.Thermostat_ModeSet:
                         {
-                            response = new ResponseText("Mode not supported: " + mode.ToString());
-                        }
-                        else
-                        {
-                            string modeSetting = Extensions.GetSetPointSetting(mode);
-                            response = new ResponseText(GetOption(modeSetting).Value.ToString());
-                        }
-                    }
-                    break;
-                case Commands.Thermostat_SetPointSet:
-                    {
-                        ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
-                        if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
-                        {
-                            response = new ResponseText("Mode not supported: " + mode.ToString());
-                        }
-                        else
-                        {
-                            string modeSetting = Extensions.GetSetPointSetting(mode);
-                            double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
-                            response = TStatPost(null, modeSetting, convertCtoF(temperature));
-                            eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
-                            eventValue = temperature.ToString(CultureInfo.InvariantCulture);
-                            SetOption(modeSetting, temperature, eventParameter, eventValue);
+                            ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
+                            response = TStatPost(null, "tmode", mode);
+                            SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
                             Update();
                         }
-                    }
-                    break;
-                case Commands.Thermostat_FanModeGet:
-                    response = new ResponseText(GetOption("fmode").Value.ToString());
-                    break;
-                case Commands.Thermostat_FanModeSet:
-                    {
-                        ThermostatFanMode mode = (ThermostatFanMode)Enum.Parse(typeof(ThermostatFanMode), request.GetOption(0));
-                        if (mode != ThermostatFanMode.OnHigh && mode != ThermostatFanMode.Circulate && mode != ThermostatFanMode.AutoHigh)
+                        break;
+                    case Commands.Thermostat_SetPointGet:
                         {
-                            response = new ResponseText("Mode not supported: " + mode.ToString());
+                            ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
+                            if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
+                            {
+                                response = new ResponseText("Mode not supported: " + mode.ToString());
+                            }
+                            else
+                            {
+                                string modeSetting = Extensions.GetSetPointSetting(mode);
+                                response = new ResponseText(GetOption(modeSetting).Value.ToString());
+                            }
                         }
-                        else
+                        break;
+                    case Commands.Thermostat_SetPointSet:
                         {
-                            int modeSetting = EnumConversion.ConvertFanModeFromHG(mode);
-                            response = TStatPost(null, "fmode", modeSetting);
-                            eventParameter = ModuleEvents.Thermostat_FanMode;
-                            SetOption("fmode", mode, eventParameter);
-                            Update();
+                            ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
+                            if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
+                            {
+                                response = new ResponseText("Mode not supported: " + mode.ToString());
+                            }
+                            else
+                            {
+                                string modeSetting = Extensions.GetSetPointSetting(mode);
+                                ThermostatMode tmode = GetOption("tmode").Value;
+                                bool validChange = false;
+                                if (mode == ThermostatSetPoint.Cooling && tmode == ThermostatMode.Cool) validChange = true;
+                                if (mode == ThermostatSetPoint.Heating && tmode == ThermostatMode.Heat) validChange = true;
+                                if (validChange)
+                                {
+                                    double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
+                                    response = TStatPost(null, modeSetting, convertCtoF(temperature));
+                                    eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
+                                    eventValue = temperature.ToString(CultureInfo.InvariantCulture);
+                                    SetOption(modeSetting, temperature, eventParameter, eventValue);
+                                }
+                                else
+                                {
+                                    response = new ResponseText("Setting point type must match current mode. " + modeSetting + " != " + tmode.ToString());
+                                }
+                            }
                         }
-                    }
-                    break;
-                case Commands.Thermostat_FanStateGet:
-                    response = new ResponseText(GetOption("fstate").Value.ToString());
-                    break;
-                case Commands.Thermostat_OperatingStateGet:
-                    response = new ResponseText(GetOption("tstate").Value.ToString());
-                    break;
-                case Commands.SensorMultiLevel_Get:
-                    response = new ResponseText(GetOption("temp").Value.ToString());
-                    break;
-                default:
-                    response = new ResponseText("ERROR: Unknown command: " + request.Command);
-                    break;
-
+                        break;
+                    case Commands.Thermostat_FanModeGet:
+                        response = new ResponseText(GetOption("fmode").Value.ToString());
+                        break;
+                    case Commands.Thermostat_FanModeSet:
+                        {
+                            ThermostatFanMode mode = (ThermostatFanMode)Enum.Parse(typeof(ThermostatFanMode), request.GetOption(0));
+                            if (mode != ThermostatFanMode.OnHigh && mode != ThermostatFanMode.Circulate && mode != ThermostatFanMode.AutoHigh)
+                            {
+                                response = new ResponseText("Mode not supported: " + mode.ToString());
+                            }
+                            else
+                            {
+                                int modeSetting = EnumConversion.ConvertFanModeFromHG(mode);
+                                response = TStatPost(null, "fmode", modeSetting);
+                                eventParameter = ModuleEvents.Thermostat_FanMode;
+                                SetOption("fmode", mode, eventParameter);
+                            }
+                        }
+                        break;
+                    case Commands.Thermostat_FanStateGet:
+                        response = new ResponseText(GetOption("fstate").Value.ToString());
+                        break;
+                    case Commands.Thermostat_OperatingStateGet:
+                        response = new ResponseText(GetOption("tstate").Value.ToString());
+                        break;
+                    case Commands.SensorMultiLevel_Get:
+                        response = new ResponseText(GetOption("temp").Value.ToString());
+                        break;
+                    default:
+                        response = new ResponseText("ERROR: Unknown command: " + request.Command);
+                        break;
+                }
             }
 
             return response;
@@ -180,7 +191,6 @@ namespace MIG.Interfaces.HomeAutomation
 
                 if (IsSimulated)
                 {
-                    // We acquire the lock and then call the NoLock version for performance
                     double temperature = convertFtoC(77.0);
                     SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
                     SetOption("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
@@ -229,7 +239,6 @@ namespace MIG.Interfaces.HomeAutomation
 
         private bool IsActive { get; set; }
 
-        private Object OptionsLock = new Object();
         private Object TstatLock = new Object();
 
         private void BackgroundUpdate()
@@ -238,7 +247,11 @@ namespace MIG.Interfaces.HomeAutomation
                 {
                     while (IsActive)
                     {
-                        Update();
+                        lock (TstatLock)
+                        {
+                            Update();
+                        }
+                            
                         Thread.Sleep(10000);
                     }
                 });
@@ -307,6 +320,11 @@ namespace MIG.Interfaces.HomeAutomation
                 webservicebaseurl += "/" + Resource;
             }
             var tstat = Net.WebService(webservicebaseurl).GetData();
+            // We are going to wait a bit less that 1 second to allow the thermostat to respond to
+            // any new values. We do this wait in the lock section so that we prevent another thread
+            // from querying the thermostat before it has had a chance to make any required adjustments.
+            Thread.Sleep(500);
+
             return tstat;
         }
 
@@ -380,12 +398,12 @@ namespace MIG.Interfaces.HomeAutomation
 
         private double convertFtoC(double F)
         {
-            return Math.Round((F - 32) / 1.8, 1);
+            return Math.Round((F - 32) / 1.8, 2);
         }
 
         private double convertCtoF(double C)
         {
-            return Math.Round(C * 1.8 + 32, 1);
+            return Math.Round(C * 1.8 + 32);
         }
 
         #endregion
