@@ -68,6 +68,14 @@ namespace MIG.Interfaces.HomeAutomation
             }
         }
 
+        public string Model
+        {
+            get
+            {
+                return GetOption("model").Value;
+            }
+        }
+
         public bool IsSimulated { get; set; }
         public IPAddress Address { get; set; }
         public List<DeviceOption> Options { get; set; }
@@ -128,6 +136,7 @@ namespace MIG.Interfaces.HomeAutomation
                                 bool validChange = false;
                                 if (mode == ThermostatSetPoint.Cooling && tmode == ThermostatMode.Cool) validChange = true;
                                 if (mode == ThermostatSetPoint.Heating && tmode == ThermostatMode.Heat) validChange = true;
+                                if (tmode == ThermostatMode.Auto) validChange = true;
                                 if (validChange)
                                 {
                                     double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
@@ -135,6 +144,12 @@ namespace MIG.Interfaces.HomeAutomation
                                     eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
                                     eventValue = temperature.ToString(CultureInfo.InvariantCulture);
                                     SetOption(modeSetting, temperature, eventParameter, eventValue);
+                                    // If the initial mode was auto, setting the setpoint will set the mode to cool. We need
+                                    // to go back to auto
+                                    if (tmode == ThermostatMode.Auto)
+                                    {
+                                        response = TStatPost(null, "tmode", ThermostatMode.Auto);
+                                    }
                                 }
                                 else
                                 {
@@ -188,10 +203,23 @@ namespace MIG.Interfaces.HomeAutomation
                 this.Address = address;
                 this.Parent = parent;
 
+                // Set initial values
+                double temperature = convertFtoC(77.0);
+                SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
+                SetOption("tmode", ThermostatMode.Off, ModuleEvents.Thermostat_Mode);
+                SetOption("tstate", ThermostatOperatingState.Idle, ModuleEvents.Thermostat_OperatingState);
+                SetOption("fmode", ThermostatFanMode.AutoHigh, ModuleEvents.Thermostat_FanMode);
+                SetOption("fstate", ThermostatFanState.Idle, ModuleEvents.Thermostat_FanState);
+                SetOption("override", State.DISABLED, null);
+                SetOption("hold", State.DISABLED, null);
+                temperature = convertFtoC(65.0);
+                SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+                temperature = convertFtoC(85.0);
+                SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                SetOption("ttarget", GetOption("tmode").Value, null);
+
                 if (IsSimulated)
                 {
-                    double temperature = convertFtoC(77.0);
-                    SetOption("temp", temperature, ModuleEvents.Sensor_Temperature, temperature.ToString(CultureInfo.InvariantCulture));
                     SetOption("tmode", ThermostatMode.Cool, ModuleEvents.Thermostat_Mode);
                     SetOption("tstate", ThermostatOperatingState.Cooling, ModuleEvents.Thermostat_OperatingState);
                     SetOption("fmode", ThermostatFanMode.AutoHigh, ModuleEvents.Thermostat_FanMode);
@@ -209,6 +237,36 @@ namespace MIG.Interfaces.HomeAutomation
                     var tstat = TStatCall("model");
                     SetOption("model", tstat.model.ToString(), null);
                     MigService.Log.Debug(String.Format("WiFI Thermostat found. Model: {0}", GetOption("model").Value));
+
+                    // We want to set the initial values correctly but the only way to get the thermostat to return the setpoint is to be in that mode
+                    bool needHeat = false;
+                    bool needCool = false;
+                    tstat = TStatCall();
+                    ThermostatMode tmode = (ThermostatMode)int.Parse(tstat.tmode.ToString());
+                    if (tmode == ThermostatMode.Auto || tmode == ThermostatMode.Cool) needHeat = true;
+                    if (tmode == ThermostatMode.Auto || tmode == ThermostatMode.Heat) needCool = true;
+                    
+                    if (needCool)
+                    {
+                        // First cool
+                        TStatPost(null, "tmode", ThermostatMode.Cool);
+                        tstat = TStatCall();
+                        temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
+                        SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                    }
+
+                    if (needHeat)
+                    {
+                        // then heat
+                        TStatPost(null, "tmode", ThermostatMode.Heat);
+                        tstat = TStatCall();
+                        temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
+                        SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+                    }
+
+                    // And back to initial mode
+                    TStatPost(null, "tmode", tmode);
+                    
                     BackgroundUpdate();
                 }
             }
@@ -281,22 +339,14 @@ namespace MIG.Interfaces.HomeAutomation
             if (HasProperty(tstat, "t_heat"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
+                SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
             }
-            else
-            {
-                temperature = convertFtoC(65.0);
-            }
-            SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
 
             if (HasProperty(tstat, "t_cool"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
+                SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
             }
-            else
-            {
-                temperature =convertFtoC(85.0);
-            }
-            SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
 
             if (HasProperty(tstat, "ttarget"))
             {
