@@ -266,6 +266,7 @@ namespace MIG.Interfaces.HomeAutomation
 
                     // And back to initial mode
                     TStatPost(null, "tmode", tmode);
+                    SetOption("last_setpoint_check", DateTimeOffset.Now, null);
                     
                     BackgroundUpdate();
                 }
@@ -312,7 +313,7 @@ namespace MIG.Interfaces.HomeAutomation
                             Update();
                         }
                             
-                        cancelled = CancelEvent.WaitOne(10000);
+                        cancelled = CancelEvent.WaitOne(60000);
                     }
                 });
         }
@@ -336,16 +337,53 @@ namespace MIG.Interfaces.HomeAutomation
             SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
             SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
 
+            // The thermostat does not return the setpoint for modes it is not in. We can get the setpoint
+            // by temporarily setting it to the appropriate mode, getting the setpoint and setting it back
+            // to the initial mode. Because it is intrusive, we only want to do this every 10 minutes
+            TimeSpan last_check = (DateTimeOffset.Now - GetOption("last_setpoint_check").Value);
+            ThermostatMode current_mode = GetOption("tmode").Value;
+            bool need_check = false;
+            bool need_set_to_initial = false;
+            if (last_check.TotalMinutes > 10) need_check = true;
+
             if (HasProperty(tstat, "t_heat"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
                 SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                if (need_check)
+                {
+                    TStatPost(null, "tmode", ThermostatMode.Heat);
+                    tstat = TStatCall();
+                    temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
+                    SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
+                    need_set_to_initial = true;
+                }
             }
 
             if (HasProperty(tstat, "t_cool"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
                 SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                if (need_check)
+                {
+                    TStatPost(null, "tmode", ThermostatMode.Cool);
+                    tstat = TStatCall();
+                    temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
+                    SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
+                    need_set_to_initial = true;
+                }
+            }
+
+            if (need_set_to_initial)
+            {
+                TStatPost(null, "tmode", current_mode);
+                SetOption("last_setpoint_check", DateTimeOffset.Now, null);
             }
 
             if (HasProperty(tstat, "ttarget"))
@@ -372,10 +410,6 @@ namespace MIG.Interfaces.HomeAutomation
                 webservicebaseurl += "/" + Resource;
             }
             var tstat = Net.WebService(webservicebaseurl).GetData();
-            // We are going to wait a bit less that 1 second to allow the thermostat to respond to
-            // any new values. We do this wait in the lock section so that we prevent another thread
-            // from querying the thermostat before it has had a chance to make any required adjustments.
-            Thread.Sleep(500);
 
             return tstat;
         }
