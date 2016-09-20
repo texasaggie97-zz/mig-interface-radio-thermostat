@@ -8,6 +8,7 @@ namespace MIG.Interfaces.HomeAutomation
 {
     public enum ThermostatMode
     {
+        Invalid = -1,
         Off = 0,
         Heat = 1,
         Cool = 2,
@@ -26,6 +27,7 @@ namespace MIG.Interfaces.HomeAutomation
 
     public enum ThermostatSetPoint
     {
+        Invalid = -1,
         Unused = 0,
         Heating = 1,
         Cooling = 2,
@@ -44,6 +46,7 @@ namespace MIG.Interfaces.HomeAutomation
 
     public enum ThermostatFanMode
     {
+        Invalid = -1,
         AutoLow = 0,
         OnLow = 1,
         AutoHigh = 2,
@@ -55,6 +58,7 @@ namespace MIG.Interfaces.HomeAutomation
 
     public enum ThermostatFanState
     {
+        Invalid = -1,
         Idle = 0,
         Running = 1,
         RunningHigh = 2,
@@ -75,6 +79,7 @@ namespace MIG.Interfaces.HomeAutomation
 
     public enum ThermostatOperatingState
     {
+        Invalid = -1,
         Idle = 0,
         Heating = 1,
         Cooling = 2,
