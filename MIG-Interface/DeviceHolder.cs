@@ -136,7 +136,6 @@ namespace MIG.Interfaces.HomeAutomation
                                 bool validChange = false;
                                 if (mode == ThermostatSetPoint.Cooling && tmode == ThermostatMode.Cool) validChange = true;
                                 if (mode == ThermostatSetPoint.Heating && tmode == ThermostatMode.Heat) validChange = true;
-                                if (tmode == ThermostatMode.Auto) validChange = true;
                                 if (validChange)
                                 {
                                     double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
@@ -144,12 +143,6 @@ namespace MIG.Interfaces.HomeAutomation
                                     eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
                                     eventValue = temperature.ToString(CultureInfo.InvariantCulture);
                                     SetOption(modeSetting, temperature, eventParameter, eventValue);
-                                    // If the initial mode was auto, setting the setpoint will set the mode to cool. We need
-                                    // to go back to auto
-                                    if (tmode == ThermostatMode.Auto)
-                                    {
-                                        response = TStatPost(null, "tmode", ThermostatMode.Auto);
-                                    }
                                 }
                                 else
                                 {
@@ -238,36 +231,6 @@ namespace MIG.Interfaces.HomeAutomation
                     SetOption("model", tstat.model.ToString(), null);
                     MigService.Log.Debug(String.Format("WiFI Thermostat found. Model: {0}", GetOption("model").Value));
 
-                    // We want to set the initial values correctly but the only way to get the thermostat to return the setpoint is to be in that mode
-                    bool needHeat = false;
-                    bool needCool = false;
-                    tstat = TStatCall();
-                    ThermostatMode tmode = (ThermostatMode)int.Parse(tstat.tmode.ToString());
-                    if (tmode == ThermostatMode.Auto || tmode == ThermostatMode.Cool) needHeat = true;
-                    if (tmode == ThermostatMode.Auto || tmode == ThermostatMode.Heat) needCool = true;
-                    
-                    if (needCool)
-                    {
-                        // First cool
-                        TStatPost(null, "tmode", ThermostatMode.Cool);
-                        tstat = TStatCall();
-                        temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
-                        SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
-                    }
-
-                    if (needHeat)
-                    {
-                        // then heat
-                        TStatPost(null, "tmode", ThermostatMode.Heat);
-                        tstat = TStatCall();
-                        temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
-                        SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-                    }
-
-                    // And back to initial mode
-                    TStatPost(null, "tmode", tmode);
-                    SetOption("last_setpoint_check", DateTimeOffset.Now, null);
-                    
                     BackgroundUpdate();
                 }
             }
@@ -281,6 +244,7 @@ namespace MIG.Interfaces.HomeAutomation
         {
             CancelEvent.Set();
         }
+
         #region Helper functions
 
         private static bool HasProperty(dynamic obj, string name)
@@ -317,7 +281,7 @@ namespace MIG.Interfaces.HomeAutomation
                     }
                 });
         }
-
+        
         private void Update()
         {
             if (IsSimulated)
@@ -340,12 +304,6 @@ namespace MIG.Interfaces.HomeAutomation
             // The thermostat does not return the setpoint for modes it is not in. We can get the setpoint
             // by temporarily setting it to the appropriate mode, getting the setpoint and setting it back
             // to the initial mode. Because it is intrusive, we only want to do this every 10 minutes
-            TimeSpan last_check = (DateTimeOffset.Now - GetOption("last_setpoint_check").Value);
-            ThermostatMode current_mode = GetOption("tmode").Value;
-            bool need_check = false;
-            bool need_set_to_initial = false;
-            if (last_check.TotalMinutes > 10) need_check = true;
-
             if (HasProperty(tstat, "t_heat"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
@@ -353,14 +311,8 @@ namespace MIG.Interfaces.HomeAutomation
             }
             else
             {
-                if (need_check)
-                {
-                    TStatPost(null, "tmode", ThermostatMode.Heat);
-                    tstat = TStatCall();
-                    temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
-                    SetOption("t_heat", temperature, ModuleEvents.Thermostat_SetPoint + "Heating", temperature.ToString(CultureInfo.InvariantCulture));
-                    need_set_to_initial = true;
-                }
+                // Maybe get the setpoint from the schedule?
+                SetOption("t_heat", 0.0, ModuleEvents.Thermostat_SetPoint + "Heating", "N/A");
             }
 
             if (HasProperty(tstat, "t_cool"))
@@ -370,20 +322,8 @@ namespace MIG.Interfaces.HomeAutomation
             }
             else
             {
-                if (need_check)
-                {
-                    TStatPost(null, "tmode", ThermostatMode.Cool);
-                    tstat = TStatCall();
-                    temperature = convertFtoC(double.Parse(tstat.t_cool.ToString()));
-                    SetOption("t_cool", temperature, ModuleEvents.Thermostat_SetPoint + "Cooling", temperature.ToString(CultureInfo.InvariantCulture));
-                    need_set_to_initial = true;
-                }
-            }
-
-            if (need_set_to_initial)
-            {
-                TStatPost(null, "tmode", current_mode);
-                SetOption("last_setpoint_check", DateTimeOffset.Now, null);
+                // Maybe get the setpoint from the schedule?
+                SetOption("t_cool", 100.0, ModuleEvents.Thermostat_SetPoint + "Cooling", "N/A");
             }
 
             if (HasProperty(tstat, "ttarget"))
@@ -453,6 +393,7 @@ namespace MIG.Interfaces.HomeAutomation
         {
             var opt = GetOption(option);
             bool raiseEvent = false;
+
             if (opt == null)
             {
                 opt = new DeviceOption(option, value);
@@ -460,6 +401,7 @@ namespace MIG.Interfaces.HomeAutomation
                 raiseEvent = true;
                 MigService.Log.Trace("{0}: {1}={2}", GetDomain(), option, value);
             }
+
             if (opt.Value != value)
             {
                 raiseEvent = true;
