@@ -42,6 +42,8 @@ namespace MIG.Interfaces.HomeAutomation
         HeatingEconomy = 11,
         CoolingEconomy = 12,
         HeatingAway = 13,
+
+        Agnostic = 33,
     }
 
     public enum ThermostatFanMode
@@ -120,6 +122,10 @@ namespace MIG.Interfaces.HomeAutomation
 
         SensorMultiLevel_Get,
 
+        Thermostat_StartQuery,
+        Thermostat_SetCacheValid,
+        Thermostat_GetCacheValid,
+        Thermostat_QueryModel,
     }
 
     public class EnumConversion

@@ -50,6 +50,8 @@ namespace MIG.Interfaces.HomeAutomation
 
     public class DeviceHolder
     {
+        public int ValidUpdate = 5;
+
         NetHelper netHelper;
 
         public DeviceHolder(bool simulate, string moduleAddress)
@@ -84,6 +86,14 @@ namespace MIG.Interfaces.HomeAutomation
 
         public string ModuleAddress { get; set; }
 
+        public DateTime LastUpdate { get; set; }
+
+        public bool NeedsUpdate()
+        {
+            if (DateTime.Now.Subtract(LastUpdate).TotalMinutes < ValidUpdate) return false;
+            return true;
+        }
+
         public ResponseText Control(MigInterfaceCommand request)
         {
             var response = new ResponseText("OK"); //default success value
@@ -93,46 +103,70 @@ namespace MIG.Interfaces.HomeAutomation
             Commands command;
             Enum.TryParse<Commands>(request.Command.Replace(".", "_"), out command);
 
-            lock (TstatLock)
+            switch (command)
             {
-                switch (command)
-                {
-                    case Commands.Thermostat_ModeGet:
-                        response = new ResponseText(GetOption("tmode").Value.ToString());
-                        break;
-                    case Commands.Thermostat_ModeSet:
+                case Commands.Thermostat_ModeGet:
+                    response = new ResponseText(GetOption("tmode").Value.ToString());
+                    break;
+                case Commands.Thermostat_ModeSet:
+                    {
+                        ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
+                        response = TStatPost(null, "tmode", mode);
+                        SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
+                        BackgroundUpdate();
+                    }
+                    break;
+                case Commands.Thermostat_SetPointGet:
+                    {
+                        ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
+                        if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
                         {
-                            ThermostatMode mode = (ThermostatMode)Enum.Parse(typeof(ThermostatMode), request.GetOption(0));
-                            response = TStatPost(null, "tmode", mode);
-                            SetOption("tmode", mode, ModuleEvents.Thermostat_Mode);
-                            Update();
+                            response = new ResponseText("Mode not supported: " + mode.ToString());
                         }
-                        break;
-                    case Commands.Thermostat_SetPointGet:
+                        else
                         {
-                            ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
-                            if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
-                            {
-                                response = new ResponseText("Mode not supported: " + mode.ToString());
-                            }
-                            else
-                            {
-                                string modeSetting = Extensions.GetSetPointSetting(mode);
-                                response = new ResponseText(GetOption(modeSetting).Value.ToString());
-                            }
+                            string modeSetting = Extensions.GetSetPointSetting(mode);
+                            response = new ResponseText(GetOption(modeSetting).Value.ToString());
                         }
-                        break;
-                    case Commands.Thermostat_SetPointSet:
+                    }
+                    break;
+                case Commands.Thermostat_SetPointSet:
+                    {
+                        ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
+                        if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling && mode != ThermostatSetPoint.Agnostic)
                         {
-                            ThermostatSetPoint mode = (ThermostatSetPoint)Enum.Parse(typeof(ThermostatSetPoint), request.GetOption(0));
-                            if (mode != ThermostatSetPoint.Heating && mode != ThermostatSetPoint.Cooling)
+                            response = new ResponseText("Mode not supported: " + mode.ToString());
+                        }
+                        else
+                        {
+                            Utility.RunAsyncTask(() =>
                             {
-                                response = new ResponseText("Mode not supported: " + mode.ToString());
-                            }
-                            else
-                            {
-                                string modeSetting = Extensions.GetSetPointSetting(mode);
+                                // If it has been too long we query the device to up to date settings
+                                if (NeedsUpdate())
+                                {
+                                    lock(TstatLock)
+                                    {
+                                        Update();
+                                    }
+                                }
+                                // If we are setting the agnostic mode then we set based on what mode we are in
                                 ThermostatMode tmode = GetOption("tmode").Value;
+                                String eventMode = request.GetOption(0);
+                                if (mode == ThermostatSetPoint.Agnostic)
+                                {
+                                    if (tmode == ThermostatMode.Cool)
+                                    {
+                                        mode = ThermostatSetPoint.Cooling;
+                                        eventMode = "Cooling";
+                                    }
+                                    if (tmode == ThermostatMode.Heat)
+                                    {
+                                        mode = ThermostatSetPoint.Heating;
+                                        eventMode = "Heating";
+                                    }
+                                }
+
+                                string modeSetting = Extensions.GetSetPointSetting(mode);
                                 bool validChange = false;
                                 if (mode == ThermostatSetPoint.Cooling && tmode == ThermostatMode.Cool) validChange = true;
                                 if (mode == ThermostatSetPoint.Heating && tmode == ThermostatMode.Heat) validChange = true;
@@ -140,49 +174,59 @@ namespace MIG.Interfaces.HomeAutomation
                                 {
                                     double temperature = double.Parse(request.GetOption(1).Replace(',', '.'), CultureInfo.InvariantCulture);
                                     response = TStatPost(null, modeSetting, convertCtoF(temperature));
-                                    eventParameter = ModuleEvents.Thermostat_SetPoint + request.GetOption(0);
+                                    eventParameter = ModuleEvents.Thermostat_SetPoint + eventMode;
                                     eventValue = temperature.ToString(CultureInfo.InvariantCulture);
                                     SetOption(modeSetting, temperature, eventParameter, eventValue);
                                 }
-                                else
-                                {
-                                    response = new ResponseText("Setting point type must match current mode. " + modeSetting + " != " + tmode.ToString());
-                                }
-                            }
+                            });
                         }
-                        break;
-                    case Commands.Thermostat_FanModeGet:
-                        response = new ResponseText(GetOption("fmode").Value.ToString());
-                        break;
-                    case Commands.Thermostat_FanModeSet:
+                    }
+                    break;
+                case Commands.Thermostat_FanModeGet:
+                    response = new ResponseText(GetOption("fmode").Value.ToString());
+                    break;
+                case Commands.Thermostat_FanModeSet:
+                    {
+                        ThermostatFanMode mode = (ThermostatFanMode)Enum.Parse(typeof(ThermostatFanMode), request.GetOption(0));
+                        if (mode != ThermostatFanMode.OnHigh && mode != ThermostatFanMode.Circulate && mode != ThermostatFanMode.AutoHigh)
                         {
-                            ThermostatFanMode mode = (ThermostatFanMode)Enum.Parse(typeof(ThermostatFanMode), request.GetOption(0));
-                            if (mode != ThermostatFanMode.OnHigh && mode != ThermostatFanMode.Circulate && mode != ThermostatFanMode.AutoHigh)
-                            {
-                                response = new ResponseText("Mode not supported: " + mode.ToString());
-                            }
-                            else
-                            {
-                                int modeSetting = EnumConversion.ConvertFanModeFromHG(mode);
-                                response = TStatPost(null, "fmode", modeSetting);
-                                eventParameter = ModuleEvents.Thermostat_FanMode;
-                                SetOption("fmode", mode, eventParameter);
-                            }
+                            response = new ResponseText("Mode not supported: " + mode.ToString());
                         }
-                        break;
-                    case Commands.Thermostat_FanStateGet:
-                        response = new ResponseText(GetOption("fstate").Value.ToString());
-                        break;
-                    case Commands.Thermostat_OperatingStateGet:
-                        response = new ResponseText(GetOption("tstate").Value.ToString());
-                        break;
-                    case Commands.SensorMultiLevel_Get:
-                        response = new ResponseText(GetOption("temp").Value.ToString());
-                        break;
-                    default:
-                        response = new ResponseText("ERROR: Unknown command: " + request.Command);
-                        break;
-                }
+                        else
+                        {
+                            int modeSetting = EnumConversion.ConvertFanModeFromHG(mode);
+                            response = TStatPost(null, "fmode", modeSetting);
+                            eventParameter = ModuleEvents.Thermostat_FanMode;
+                            SetOption("fmode", mode, eventParameter);
+                        }
+                    }
+                    break;
+                case Commands.Thermostat_FanStateGet:
+                    response = new ResponseText(GetOption("fstate").Value.ToString());
+                    break;
+                case Commands.Thermostat_OperatingStateGet:
+                    response = new ResponseText(GetOption("tstate").Value.ToString());
+                    break;
+                case Commands.SensorMultiLevel_Get:
+                    response = new ResponseText(GetOption("temp").Value.ToString());
+                    break;
+                // Commands that are not part of the ZWave thermostat API
+                case Commands.Thermostat_StartQuery:
+                    BackgroundUpdate();
+                    break;
+                case Commands.Thermostat_SetCacheValid:
+                    int timeout = int.Parse(request.GetOption(1));
+                    ValidUpdate = timeout;
+                    break;
+                case Commands.Thermostat_GetCacheValid:
+                    response = new ResponseText(ValidUpdate.ToString());
+                    break;
+                case Commands.Thermostat_QueryModel:
+                    response = new ResponseText(GetOption("model").Value);
+                    break;
+                default:
+                    response = new ResponseText("ERROR: Unknown command: " + request.Command);
+                    break;
             }
 
             return response;
@@ -269,15 +313,9 @@ namespace MIG.Interfaces.HomeAutomation
         {
             Utility.RunAsyncTask(() =>
                 {
-                    bool cancelled = false;
-                    while (!cancelled)
+                    lock (TstatLock)
                     {
-                        lock (TstatLock)
-                        {
-                            Update();
-                        }
-                            
-                        cancelled = CancelEvent.WaitOne(60000);
+                        Update();
                     }
                 });
         }
@@ -287,8 +325,6 @@ namespace MIG.Interfaces.HomeAutomation
             if (IsSimulated)
                 return;
 
-            // Wait 1 second before querying the thermostat
-            string webservicebaseurl = "http://" + Address + "/tstat";
             var tstat = TStatCall();
 
             // We acquire the lock and then call the NoLock version for performance
@@ -301,9 +337,7 @@ namespace MIG.Interfaces.HomeAutomation
             SetOption("override", (State)int.Parse(tstat.fmode.ToString()), null);
             SetOption("hold", (State)int.Parse(tstat.fmode.ToString()), null);
 
-            // The thermostat does not return the setpoint for modes it is not in. We can get the setpoint
-            // by temporarily setting it to the appropriate mode, getting the setpoint and setting it back
-            // to the initial mode. Because it is intrusive, we only want to do this every 10 minutes
+            // The thermostat does not return the setpoint for modes it is not in. 
             if (HasProperty(tstat, "t_heat"))
             {
                 temperature = convertFtoC(double.Parse(tstat.t_heat.ToString()));
@@ -334,6 +368,8 @@ namespace MIG.Interfaces.HomeAutomation
             {
                 SetOption("ttarget", GetOption("tmode").Value, null);
             }
+
+            LastUpdate = DateTime.Now;
         }
 
         private string GetJsonString(string item, dynamic value)
@@ -364,11 +400,14 @@ namespace MIG.Interfaces.HomeAutomation
             }
             if (!IsSimulated)
             {
-                response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Item, Value)).Call());
-                // We are going to wait a bit less that 1 second to allow the thermostat to respond to
-                // any new values. We do this wait in the lock section so that we prevent another thread
-                // from querying the thermostat before it has had a chance to make any required adjustments.
-                Thread.Sleep(800);
+                lock (TstatLock)
+                {
+                    response = new ResponseText(Net.WebService(webservicebaseurl).Post(GetJsonString(Item, Value)).Call());
+                    // We are going to wait a bit less that 1 second to allow the thermostat to respond to
+                    // any new values. We do this wait in the lock section so that we prevent another thread
+                    // from querying the thermostat before it has had a chance to make any required adjustments.
+                    Thread.Sleep(800);
+                }
             }
             return response;
         }
